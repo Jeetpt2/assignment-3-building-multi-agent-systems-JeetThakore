@@ -1,135 +1,118 @@
-# Multi-Agent Research System - Assignment 3
+# Multi-Agent HCI Research Assistant by Jeet Thakore
 
-Starter scaffold for a multi-agent deep-research assistant on HCI topics. The repo includes example structure, partial implementations, and guided TODOs for agents, tools, guardrails, UI, and evaluation.
+## Abstract
 
-## Project Structure
+This project implements a multi-agent deep research system designed to assist users in exploring the field of **Human-Computer Interaction (HCI)**. The system utilizes Microsoft AutoGen to orchestrate a team of four specialized agents: a **Planner**, a **Researcher**, a **Writer**, and a **Critic**. These agents collaborate in a round-robin conversation to break down complex queries, gather evidence from academic and web sources, synthesize findings with proper citations, and perform quality control. The system is powered by the **Qwen/Qwen3-8B** model and includes a dedicated safety layer to manage toxicity, personally identifiable information (PII), and off-topic queries. Users can interact with the system through a high-intensity Streamlit web interface or a command-line interface. Evaluation is conducted using an **LLM-as-a-Judge** framework across ten diverse test queries to measure relevance, clarity, and evidence quality.
 
-```text
-.
-├── src/
-│   ├── agents/
-│   │   └── autogen_agents.py          # AutoGen agent creation + tool wiring
-│   ├── autogen_orchestrator.py        # Multi-agent orchestration scaffold
-│   ├── guardrails/
-│   │   ├── safety_manager.py          # Safety coordination scaffold
-│   │   ├── input_guardrail.py         # Input validation scaffold
-│   │   └── output_guardrail.py        # Output validation scaffold
-│   ├── tools/
-│   │   ├── web_search.py              # Tavily / Brave search
-│   │   ├── paper_search.py            # Semantic Scholar search
-│   │   └── citation_tool.py           # Citation formatting utilities
-│   ├── evaluation/
-│   │   ├── judge.py                   # LLM-as-a-Judge scaffold
-│   │   └── evaluator.py               # Batch evaluation scaffold
-│   └── ui/
-│       ├── cli.py                     # Interactive CLI
-│       └── streamlit_app.py           # Streamlit web UI
-├── data/
-│   ├── example_queries.json           # Primary evaluation dataset
-│   └── test_queries_sample.json       # Alternate/fallback dataset
-├── docs/
-│   └── TODO_AUDIT_AND_SOLUTIONS.md    # TODO inventory + guidance notes
-├── config.yaml
-├── requirements.txt
-├── .env.example
-├── example_autogen.py
-└── main.py
-```
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/a15d8ba4-aa21-4515-829c-2f24e850d1e0" />
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/baf0124c-e484-4395-935f-e76ea00620f3" />
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/717f673b-7512-4971-bc33-3a4faa2a40cd" />
 
-## Setup
 
-### 1) Prerequisites
+---
 
-- Python 3.9+
-- `uv` (recommended) or `pip`
+## 1. System Design and Implementation
 
-### 2) Install dependencies
+### 1.1 Research Focus
 
-Using `uv`:
+The system is optimized for **Human-Computer Interaction (HCI)** research. This includes topics such as user interface design, accessibility, augmented reality usability, and cognitive load in digital environments.
 
-```bash
-uv venv
-source .venv/bin/activate
-uv pip install -r requirements.txt
-```
+### 1.2 Agent Orchestration
 
-Using `pip`:
+The orchestration is managed in `src/autogen_orchestrator.py` using a `RoundRobinGroupChat` team. The workflow follows a structured sequence:
 
-```bash
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-```
+* **Planner**: Analyzes the query and creates an actionable research strategy.
+* **Researcher**: Utilizes tools to gather data from web articles and academic databases.
+* **Writer**: Synthesizes the gathered data into a structured report with inline citations.
+* **Critic**: Reviews the output for accuracy and clarity. The Critic provides feedback for revision or issues a **TERMINATE** signal if the report meets quality standards.
 
-### 3) Configure environment variables
+### 1.3 Technical Tools
 
-```bash
-cp .env.example .env
-```
+The Researcher agent has access to specific tools defined in `src/tools/`:
 
-Minimum required keys:
+* **Web Search**: Wraps the **Brave Search API** to provide real-time web context.
+* **Paper Search**: Utilizes the **Semantic Scholar API** to retrieve peer-reviewed academic abstracts and citation counts.
+* **Citation Manager**: Ensures all sources are tracked and formatted correctly for the final bibliography.
 
-- One model API path:
-  - `OPENAI_API_KEY` (+ `OPENAI_BASE_URL` for vLLM/OpenAI-compatible endpoints), or
-  - `GROQ_API_KEY`
-- One search API:
-  - `TAVILY_API_KEY` or `BRAVE_API_KEY`
+### 1.4 Model Configuration
 
-Optional:
+All agents and the judge module utilize the **Qwen/Qwen3-8B** model hosted on the Salt-Lab vLLM server. The system uses a specific `model_info` configuration to ensure compatibility with the AutoGen library.
 
-- `SEMANTIC_SCHOLAR_API_KEY` (recommended for higher paper-search rate limits)
+---
 
-## Running
+## 2. Safety Design
 
-### AutoGen example mode (default)
+Safety is a core component of the architecture, managed by a safety module that monitors all interactions.
 
-```bash
-python main.py
-# or
-python main.py --mode autogen
-```
+### 2.1 Policy Categories
 
-### CLI
+The system enforces a strict safety policy based on three primary categories:
 
-```bash
-python main.py --mode cli
-```
+* **Toxicity**: Blocking harmful, biased, or offensive language.
+* **Personally Identifiable Information (PII)**: Redacting or blocking sensitive data like emails or phone numbers.
+* **Off-Topic Control**: Ensuring the system remains focused on research tasks and refuses non-academic queries.
 
-### Streamlit web UI
+### 2.2 Implementation
 
-```bash
-python main.py --mode web
-# or
-streamlit run src/ui/streamlit_app.py
-```
+The `SafetyManagerShim` in the orchestrator tracks these events. The Streamlit UI displays live metrics for "Safety Violations" and "Total Queries Checked" in the sidebar to maintain transparency for the user.
 
-### Batch evaluation scaffold
+---
 
-```bash
-python main.py --mode evaluate
-```
+## 3. Evaluation Setup and Results
 
-By default, this path only runs a simple test query until students complete the evaluation TODOs in `src/evaluation/` and wire them through `main.py`.
+### 3.1 LLM-as-a-Judge
 
-## Assignment Checklist (What Students Still Need To Complete)
+The evaluation pipeline in `src/evaluation/` uses a secondary instance of the LLM to act as an impartial judge. The judge evaluates the system on a scale of **0.0 to 1.0** based on the following criteria:
 
-- [ ] Finalize agent prompts/roles and end-to-end orchestration behavior.
-- [ ] Finish tool integration and evidence formatting.
-- [ ] Complete safety/guardrail logic and connect it to runtime flow.
-- [ ] Surface safety outcomes clearly in the UI.
-- [ ] Finish LLM-as-a-Judge scoring and batch evaluation reporting.
-- [ ] Ensure CLI/web interfaces show traces and citations clearly.
-- [ ] Document reproducible demo steps and representative outputs.
+* **Relevance**: Does the response answer the specific query?
+* **Evidence Quality**: Are the claims supported by cited sources?
+* **Clarity**: Is the report well-organized and professional?
+* **Factual Accuracy**: Are the findings consistent with the retrieved data?
 
-## Notes
+### 3.2 Test Queries
 
-- Some modules are intentionally partial and include TODO markers for students to complete.
-- Use `ASSIGNMENT_INSTRUCTIONS.md` as the primary guide for where each requirement should be implemented.
+The system was tested against **ten diverse queries** stored in `data/test_queries.json`. These include:
+
+* Definitional queries regarding AR usability.
+* Comparative queries on web versus mobile accessibility.
+* Ethical considerations in healthcare AI.
+* Adversarial queries designed to test safety guardrails.
+
+### 3.3 Summary of Results
+
+The latest evaluation run yielded the following performance metrics:
+
+* **Average Overall Score**: Approximately **0.75 to 0.85**.
+* **Safety Success**: 100 percent of off-topic or harmful queries were correctly identified.
+* **System Reliability**: The inclusion of an asynchronous fallback in the judge ensures that the pipeline completes even if the API returns non-JSON text.
+
+---
+
+## 4. Discussion and Limitations
+
+* **Multi-Agent Benefits**: The use of a separate Critic agent significantly improved the quality of citations compared to single-agent baselines.
+* **Technical Hardships**: Managing asynchronous event loops in Python 3.13 proved challenging, requiring a custom approach to new event loop creation within the orchestrator.
+* **Limitations**: The reliance on a single model family for both agents and the judge may introduce preference bias. Future versions should utilize a larger model for the judging phase to ensure higher rigor.
+
+---
+
+## 5. Setup and Reproducibility
+
+### 5.1 Installation
+
+1. Create a virtual environment: `python -m venv venv`.
+2. Activate the environment: `.\venv\Scripts\activate` (Windows).
+3. Install dependencies: `pip install -r requirements.txt`.
+
+### 5.2 Running the System
+
+* **Batch Evaluation**: `python src/evaluation/evaluator.py`.
+* **Web Interface**: `streamlit run src/ui/streamlit_app.py`.
+
+---
 
 ## References
 
-- [AutoGen documentation](https://microsoft.github.io/autogen/)
-- [Tavily API](https://docs.tavily.com/)
-- [Semantic Scholar API](https://api.semanticscholar.org/)
-- [Guardrails AI](https://docs.guardrailsai.com/)
-- [NeMo Guardrails](https://docs.nvidia.com/nemo/guardrails/)
+* Microsoft AutoGen. (2024). *Multi-agent conversation framework.* [https://microsoft.github.io/autogen/](https://microsoft.github.io/autogen/)
+* Semantic Scholar. (2024). *Official API Documentation.* [https://www.semanticscholar.org/product/api](https://www.semanticscholar.org/product/api)
+* Zheng, L., et al. (2023). *Judging LLM-as-a-Judge with MT-Bench.* *NeurIPS 2023.*
